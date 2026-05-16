@@ -46,17 +46,3 @@ Unlike standard single-database student projects, this application implements a 
     * Connect your test device via USB/Wi-Fi or launch your emulator.
     * Select your target device from the top toolbar dropdown menu.
     * Click the green **Run** button to compile and launch the application.
-
----
-
-##  Project Structure
-```text
-app/src/main/java/com/mindmatrix/shaalevikas/
-│
-├── data/          # Supabase & Firestore configuration models and data classes
-├── repository/    # Repository abstraction layer bridging UI and Cloud providers
-├── ui/            # Jetpack Compose screens, custom themes, and reusable UI components
-│   ├── admin/     # Headmaster portal configuration and add-need screens
-│   ├── alumni/    # Donor dashboard, progress indicators, and Hall of Fame lists
-│   └── theme/     # Typography and custom Material3 palette definitions
-└── viewmodel/     # StateFlow pipelines managing architecture logic and aggregations
