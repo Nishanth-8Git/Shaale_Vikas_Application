@@ -3,6 +3,7 @@
 An industry-ready, hybrid-cloud Android application built during the **MindMatrix Industry Readiness Programme**. **Shaale Vikas** acts as a transparent digital bridge connecting rural school administrators directly with their alumni donor network to solve critical infrastructure needs.
 (P.S You can view the demo in this YouTube video: https://youtu.be/suh0DdT8wY4 )
 {OR use this to redirect to YouTube directly by clicking on the image.}
+
 [![Shaale Vikas Application Demo.](https://img.youtube.com/vi/suh0DdT8wY4/0.jpg)](https://www.youtube.com/watch?v=suh0DdT8wY4)
 
 
