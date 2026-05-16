@@ -1,6 +1,7 @@
 package com.example.shaalevikas.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.shaalevikas.model.Comment
 import com.example.shaalevikas.model.Need
 import com.example.shaalevikas.model.Pledge
@@ -8,8 +9,11 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.toObject
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 
 /**
  * ViewModel for the Alumni Dashboard (NeedsDashboardScreen).
@@ -19,13 +23,49 @@ class NeedsDashboardViewModel : ViewModel() {
     private val firestore = FirebaseFirestore.getInstance()
     
     private val _needs = MutableStateFlow<List<Need>>(emptyList())
-    val needs: StateFlow<List<Need>> = _needs.asStateFlow()
+    
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _selectedCategory = MutableStateFlow<String?>(null)
+    val selectedCategory: StateFlow<String?> = _selectedCategory.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    // Combined stream for filtered needs
+    val filteredNeeds: StateFlow<List<Need>> = combine(
+        _needs,
+        _searchQuery,
+        _selectedCategory
+    ) { rawNeeds, query, category ->
+        rawNeeds.filter { need ->
+            val matchesQuery = query.isBlank() || 
+                need.title.contains(query, ignoreCase = true) || 
+                need.description.contains(query, ignoreCase = true) ||
+                need.schoolId.contains(query, ignoreCase = true)
+            
+            val matchesCategory = category == null || need.categories.contains(category)
+            
+            matchesQuery && matchesCategory
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList<Need>()
+    )
+
     init {
         listenToNeeds()
+    }
+
+    fun onSearchQueryChanged(newQuery: String) {
+        _searchQuery.value = newQuery
+    }
+
+    fun onCategorySelected(category: String?) {
+        // Toggle if clicking already selected
+        _selectedCategory.value = if (_selectedCategory.value == category) null else category
     }
 
     private fun listenToNeeds() {
@@ -118,5 +158,20 @@ class NeedsDashboardViewModel : ViewModel() {
             .update("comments", FieldValue.arrayUnion(comment))
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { e -> onError(e.message ?: "Failed to add comment") }
+    }
+
+    /**
+     * Fetches all donors for a specific need.
+     */
+    fun getDonorsForNeed(needId: String, onResult: (List<Pledge>) -> Unit) {
+        firestore.collection("pledges")
+            .whereEqualTo("needId", needId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                onResult(snapshot.toObjects(Pledge::class.java))
+            }
+            .addOnFailureListener {
+                onResult(emptyList())
+            }
     }
 }

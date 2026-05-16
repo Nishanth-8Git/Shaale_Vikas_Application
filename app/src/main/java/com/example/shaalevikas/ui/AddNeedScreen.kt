@@ -47,7 +47,16 @@ fun AddNeedScreen(
     var impact by remember { mutableFloatStateOf(3f) }
     
     // New Categories
-    val availableCategories = listOf("Classroom Repair", "Toilets", "Drinking Water", "Electricity", "Furniture")
+    val availableCategories = listOf(
+        "Toilets & Sanitation",
+        "Drinking Water",
+        "Classroom Repairs",
+        "Digital & IT Labs",
+        "Desk & Bench Furniture",
+        "Electrical & Fans",
+        "Library Books",
+        "Sports & Playground"
+    )
     var selectedCategories by remember { mutableStateOf(setOf<String>()) }
 
     var targetNeed by remember { mutableStateOf<Need?>(null) }

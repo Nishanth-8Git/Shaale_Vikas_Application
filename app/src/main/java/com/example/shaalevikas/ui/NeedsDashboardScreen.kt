@@ -7,12 +7,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,8 +26,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.shaalevikas.model.Need
+import com.example.shaalevikas.ui.components.FilterSearchHeader
+import com.example.shaalevikas.utils.PdfGenerator
 import com.example.shaalevikas.viewmodel.NeedsDashboardViewModel
-import java.text.NumberFormat
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,7 +39,9 @@ fun NeedsDashboardScreen(
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    val needs by viewModel.needs.collectAsState()
+    val needs by viewModel.filteredNeeds.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val selectedCategory by viewModel.selectedCategory.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
     var showPledgeDialog by remember { mutableStateOf(false) }
@@ -53,62 +52,92 @@ fun NeedsDashboardScreen(
     var showImpactDialog by remember { mutableStateOf(false) }
     var impactNeed by remember { mutableStateOf<Need?>(null) }
 
-    Box(
-        modifier = modifier.fillMaxSize()
-    ) {
-        if (isLoading) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-        } else if (needs.isEmpty()) {
-            Column(
-                modifier = Modifier.align(Alignment.Center).padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.outline
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "No active needs found.",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.outline,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = "Check back later or contact the administrator.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.outline,
-                    textAlign = TextAlign.Center
-                )
-            }
-        } else {
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(needs) { need ->
-                    NeedCard(
-                        need = need,
-                        onPledgeClick = {
-                            selectedNeed = need
-                            showPledgeDialog = true
-                        },
-                        onViewImpactClick = {
-                            impactNeed = need
-                            showImpactDialog = true
-                        },
-                        onSendComment = { message, name ->
-                            viewModel.addComment(need.docId, name, message)
-                        }
+    val categories = listOf(
+        "Toilets & Sanitation",
+        "Drinking Water",
+        "Classroom Repairs",
+        "Digital & IT Labs",
+        "Desk & Bench Furniture",
+        "Electrical & Fans",
+        "Library Books",
+        "Sports & Playground"
+    )
+
+    Column(modifier = modifier.fillMaxSize()) {
+        FilterSearchHeader(
+            searchQuery = searchQuery,
+            onSearchQueryChanged = viewModel::onSearchQueryChanged,
+            selectedCategory = selectedCategory,
+            onCategorySelected = viewModel::onCategorySelected,
+            categories = categories
+        )
+
+        Box(
+            modifier = Modifier.weight(1f)
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            } else if (needs.isEmpty()) {
+                val isFilterActive = searchQuery.isNotEmpty() || selectedCategory != null
+                Column(
+                    modifier = Modifier.align(Alignment.Center).padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = if (isFilterActive) Icons.Default.Warning else Icons.Default.Info,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.outline
                     )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = if (isFilterActive) "No school matching your filters was found." else "No active needs found.",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        textAlign = TextAlign.Center
+                    )
+                    if (!isFilterActive) {
+                        Text(
+                            text = "Check back later or contact the administrator.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.outline,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(needs) { need ->
+                        NeedCard(
+                            need = need,
+                            onPledgeClick = {
+                                selectedNeed = need
+                                showPledgeDialog = true
+                            },
+                            onViewImpactClick = {
+                                impactNeed = need
+                                showImpactDialog = true
+                            },
+                            onSendComment = { message, name ->
+                                viewModel.addComment(need.docId, name, message)
+                            },
+                            onGenerateReport = {
+                                viewModel.getDonorsForNeed(need.docId) { donors ->
+                                    PdfGenerator.generateProjectReport(context, need, donors)
+                                    Toast.makeText(context, "Preparing PDF Report...", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
     }
 
-    if (showImpactDialog && impactNeed != null) {
+    if (showImpactDialog && (impactNeed != null)) {
         AlertDialog(
             onDismissRequest = { showImpactDialog = false },
             title = { Text("Impact: ${impactNeed?.title}") },
@@ -241,7 +270,8 @@ fun NeedCard(
     need: Need,
     onPledgeClick: () -> Unit,
     onViewImpactClick: () -> Unit,
-    onSendComment: (String, String) -> Unit
+    onSendComment: (String, String) -> Unit,
+    onGenerateReport: () -> Unit
 ) {
     val isFulfilled = need.currentPledgedAmount >= need.estimatedCost
     val hasAfterPhoto = need.imageUrlAfter.isNotBlank()
@@ -371,19 +401,27 @@ fun NeedCard(
                     color = MaterialTheme.colorScheme.secondary
                 )
                 
-                if (hasAfterPhoto) {
-                    Button(
-                        onClick = onViewImpactClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
-                    ) {
-                        Text("View Impact")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (isFulfilled) {
+                        OutlinedButton(onClick = onGenerateReport) {
+                            Text("Report")
+                        }
                     }
-                } else {
-                    Button(
-                        onClick = onPledgeClick,
-                        enabled = !isFulfilled
-                    ) {
-                        Text(if (isFulfilled) "Funded" else "Pledge")
+
+                    if (hasAfterPhoto) {
+                        Button(
+                            onClick = onViewImpactClick,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                        ) {
+                            Text("View Impact")
+                        }
+                    } else {
+                        Button(
+                            onClick = onPledgeClick,
+                            enabled = !isFulfilled
+                        ) {
+                            Text(if (isFulfilled) "Funded" else "Pledge")
+                        }
                     }
                 }
             }
@@ -435,7 +473,7 @@ fun NeedCard(
                                     newComment = ""
                                 }
                             }) {
-                                Icon(Icons.Default.Send, contentDescription = "Send")
+                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
                             }
                         }
                     )
@@ -520,7 +558,8 @@ fun NeedsDashboardScreenPreview() {
                     need = need, 
                     onPledgeClick = {}, 
                     onViewImpactClick = {},
-                    onSendComment = { _, _ -> }
+                    onSendComment = { _, _ -> },
+                    onGenerateReport = {}
                 )
             }
         }
